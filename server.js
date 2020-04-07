@@ -37,15 +37,13 @@ function checkLocation (request,response){
       } else {
         getLocation(city)
           .then(locationData => {
-            console.log(locationData);
-            //locationData {search_query,formatted_query,latitude,longitude}
-            let ccty = locationData.search_query;
-            let foQuery =  locationData.formatted_query;
+            let myCity = locationData.search_query;
+            let format =  locationData.formatted_query;
             let lat = locationData.latitude;
-            let lng = locationData.longitude;
-            let safeValues = [ccty,foQuery,lat,lng];
-            let SQL = 'INSERT INTO cites (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
-            client.query(SQL,safeValues)
+            let lon = locationData.longitude;
+            let safeValues = [myCity,format,lat,lon];
+            let SQL = 'INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
+            return client.query(SQL,safeValues)
               .then(result2 => {
                 response.status(200).json(result2.rows[0]);
               })
