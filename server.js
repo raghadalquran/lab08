@@ -1,5 +1,4 @@
 'use strict';
-
 //  In this step i load the Environment Variables from the .env file
 require('dotenv').config();
 
@@ -9,7 +8,7 @@ const cors = require('cors');
 const superagent = require('superagent');
 const pg = require('pg');
 //  Setup My Application
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 4000;
 const app = express();
 app.use(cors());
 
@@ -17,52 +16,55 @@ const client = new pg.Client(process.env.DATABASE_URL);
 client.on('error', err =>{
   throw new Error (err);
 });
-
-
-
-
-
-
-client
-  .connect()
-  .then(() => {
-    app.listen(PORT, () =>
-      console.log(`my server is up and running on port ${PORT}`)
-    );
-  })
-  .catch((err) => {
-    throw new Error(`startup error ${err}`);
-  });
-
-
-
-
 app.get('/', (request, response) => {
   response.send('Home Page!');
 });
-
 // Route Definitions
-app.get('/location', locationHandler);
+app.get('/location', checkLocation);
 app.get('/weather', weatherHandler);
 app.get('/trails',trailsHandler);
 app.use('*', notFoundHandler);
 app.use(errorHandler);
 
-// Route Handlers
-function locationHandler(request, response) {
+function checkLocation (request,response){
   const city = request.query.city;
-  let key = process.env.GEOCODE_API_KEY;
-  superagent(
-    `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${city}&format=json`
-  )
-    .then((res) => {
-      const geoData = res.body;
-      const locationData = new Location(city, geoData);
-      response.status(200).json(locationData);
+  let sqlCheck = `SELECT * FROM locations WHERE search_query = '${city}';`;
+  client.query(sqlCheck)
+    .then(result => {
+      if(result.rows.length > 0){
+        response.status(200).json(result.rows[0]);
+        console.log(result.rows.length);
+      } else {
+        getLocation(city)
+          .then(locationData => {
+            console.log(locationData);
+            //locationData {search_query,formatted_query,latitude,longitude}
+            let ccty = locationData.search_query;
+            let foQuery =  locationData.formatted_query;
+            let lat = locationData.latitude;
+            let lng = locationData.longitude;
+            let safeValues = [ccty,foQuery,lat,lng];
+            let SQL = 'INSERT INTO cites (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
+            client.query(SQL,safeValues)
+              .then(result2 => {
+                response.status(200).json(result2.rows[0]);
+              })
+              .catch (error => errorHandler(error));
+          })
+      }
     })
-    .catch((err) => errorHandler(err, request, response));
 }
 
+// Route Handlers
+function getLocation(city){
+  let key = process.env.GEOCODE_API_KEY;
+  const url = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${city}&format=json`;
+  return superagent.get(url)
+    .then(geoData => {
+      const locationData = new Location(city, geoData.body);
+      return locationData;
+    })
+}
 function Location(city, geoData) {
   this.search_query = city;
   this.formatted_query = geoData[0].display_name;
@@ -131,6 +133,13 @@ function notFoundHandler(request, response) {
 function errorHandler(error, request, response) {
   response.status(500).send(error);
 }
-
-// Make sure the server is listening for requests
-app.listen(PORT, () => console.log(`App is listening on ${PORT}`));
+client
+  .connect()
+  .then(() => {
+    app.listen(PORT, () =>
+      console.log(`my server is up and running on port ${PORT}`)
+    );
+  })
+  .catch((err) => {
+    throw new Error(`startup error ${err}`);
+  });

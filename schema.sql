@@ -1,8 +1,9 @@
-DROP TABEL IF EXISTS locations;
-CREATE TABLE locations(
+DROP TABLE IF EXISTS locations;
+
+CREATE TABLE locations (
     id SERIAL PRIMARY KEY,
-    city VARCHAR (255),
-    the_location VARCHAR (255),
-    weather VARCHAR (255),
-    trails VARCHAR (255)
-);
+    search_query VARCHAR(255),
+    formatted_query VARCHAR(255),
+    latitude NUMERIC(10, 7),
+    longitude NUMERIC(10, 7)
+  );
